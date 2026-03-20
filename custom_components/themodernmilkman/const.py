@@ -2,7 +2,7 @@
 
 DOMAIN = "themodernmilkman"
 TMM_LOGIN_URL = "https://tmm-website-xi.vercel.app/api/auth/login"
-TMM_NEXT_DELIVERY_URL = "https://tmm-website-xi.vercel.app/api/delivery/next"
+TMM_NEXT_DELIVERY_URL = "https://themodernmilkman.co.uk/api/delivery/next"
 TMM_USER_WASTEAGE_URL = "https://tmm-website-xi.vercel.app/api/user/wastage"
 TMM_USER_STATE_URL = "https://tmm-website-xi.vercel.app/api/user/state"
 CONF_USERNAME = "username"
@@ -18,6 +18,7 @@ CONF_BOTTLESSAVED = "bottlesSaved"
 CONF_WASTAGE = "wastage"
 CONF_NEXT_DELIVERY = "next_delivery"
 CONF_DELIVERYDATE = "deliveryDate"
+CONF_ITEMS = "items"
 CONF_UNKNOWN = "Unknown"
 REQUEST_HEADER = {
     "Content-Type": "application/json",
