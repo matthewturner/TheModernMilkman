@@ -2,7 +2,7 @@
 
 DOMAIN = "themodernmilkman"
 TMM_LOGIN_URL = "https://tmm-website-xi.vercel.app/api/auth/login"
-TMM_NEXT_DELIVERY_URL = "https://themodernmilkman.co.uk/api/delivery/next"
+TMM_NEXT_DELIVERY_URL = "https://tmm-website-xi.vercel.app/api/delivery/next"
 TMM_USER_WASTEAGE_URL = "https://tmm-website-xi.vercel.app/api/user/wastage"
 TMM_USER_STATE_URL = "https://tmm-website-xi.vercel.app/api/user/state"
 CONF_USERNAME = "username"
