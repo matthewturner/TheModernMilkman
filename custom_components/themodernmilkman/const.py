@@ -18,6 +18,7 @@ CONF_BOTTLESSAVED = "bottlesSaved"
 CONF_WASTAGE = "wastage"
 CONF_NEXT_DELIVERY = "next_delivery"
 CONF_DELIVERYDATE = "deliveryDate"
+CONF_ITEMS = "items"
 CONF_UNKNOWN = "Unknown"
 REQUEST_HEADER = {
     "Content-Type": "application/json",
