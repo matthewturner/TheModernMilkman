@@ -6,13 +6,15 @@ import asyncio
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
+from .const import CONF_COORDINATOR, DOMAIN, SERVICE_REFRESH_DATA
+from .coordinator import TMMCoordinator
 
-PLATFORMS = [Platform.CALENDAR, Platform.SENSOR]
+PLATFORMS = [Platform.BUTTON, Platform.CALENDAR, Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
@@ -21,6 +23,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass_data = dict(entry.data)
 
+    session = async_get_clientsession(hass)
+    coordinator = TMMCoordinator(hass, session, entry.data)
+    await coordinator.async_config_entry_first_refresh()
+    hass_data[CONF_COORDINATOR] = coordinator
+
     # Registers update listener to update config entry when options are updated.
     unsub_options_update_listener = entry.add_update_listener(options_update_listener)
 
@@ -28,6 +35,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(unsub_options_update_listener)
 
     hass.data[DOMAIN][entry.entry_id] = hass_data
+
+    async def _async_refresh_data(call: ServiceCall) -> None:
+        """Manually refresh data from The Modern Milkman API."""
+        for entry_id, entry_data in hass.data[DOMAIN].items():
+            if isinstance(entry_data, dict):
+                coord = entry_data.get(CONF_COORDINATOR)
+                if coord:
+                    await coord.async_request_refresh()
+
+    if not hass.services.has_service(DOMAIN, SERVICE_REFRESH_DATA):
+        hass.services.async_register(DOMAIN, SERVICE_REFRESH_DATA, _async_refresh_data)
+
     # Forward the setup to each platform.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -59,6 +78,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Remove config entry from domain.
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+
+    # Remove service when no more entries are loaded.
+    if not hass.data[DOMAIN] and hass.services.has_service(DOMAIN, SERVICE_REFRESH_DATA):
+        hass.services.async_remove(DOMAIN, SERVICE_REFRESH_DATA)
 
     return unload_ok
 

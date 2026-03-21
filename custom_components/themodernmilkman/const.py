@@ -20,6 +20,8 @@ CONF_NEXT_DELIVERY = "next_delivery"
 CONF_DELIVERYDATE = "deliveryDate"
 CONF_ITEMS = "items"
 CONF_UNKNOWN = "Unknown"
+CONF_COORDINATOR = "coordinator"
+SERVICE_REFRESH_DATA = "refresh_data"
 REQUEST_HEADER = {
     "Content-Type": "application/json",
 }

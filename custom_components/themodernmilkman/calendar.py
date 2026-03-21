@@ -10,13 +10,13 @@ from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import TMMCoordinator
 from .const import (
+    CONF_COORDINATOR,
     DOMAIN,
     CONF_CALENDARS,
     CONF_NEXT_DELIVERY,
@@ -38,10 +38,7 @@ async def async_setup_entry(
 
     calendars = entry.data[CONF_CALENDARS]
 
-    session = async_get_clientsession(hass)
-    coordinator = TMMCoordinator(hass, session, entry.data)
-
-    await coordinator.async_refresh()
+    coordinator = hass.data[DOMAIN][entry.entry_id][CONF_COORDINATOR]
 
     sensors = [TMMCalendarSensor(coordinator, entry.title)]
 

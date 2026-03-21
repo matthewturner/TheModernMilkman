@@ -17,5 +17,18 @@
       "abort": {
         "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
       }
+    },
+    "entity": {
+      "button": {
+        "themodernmilkman_refresh": {
+          "name": "Refresh"
+        }
+      }
+    },
+    "services": {
+      "refresh_data": {
+        "name": "Refresh data",
+        "description": "Manually refresh data from The Modern Milkman API."
+      }
     }
 }
