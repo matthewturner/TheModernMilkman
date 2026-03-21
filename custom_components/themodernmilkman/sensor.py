@@ -11,7 +11,6 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
@@ -20,6 +19,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import (
+    CONF_COORDINATOR,
     CONF_WASTAGE,
     CONF_BOTTLESSAVED,
     DOMAIN,
@@ -43,11 +43,7 @@ async def async_setup_entry(
         config.update(entry.options)
 
     if entry.data:
-        session = async_get_clientsession(hass)
-
-        coordinator = TMMCoordinator(hass, session, entry.data)
-
-        await coordinator.async_config_entry_first_refresh()
+        coordinator = hass.data[DOMAIN][entry.entry_id][CONF_COORDINATOR]
 
         wastage_sensor = TMMWastageSensor(coordinator, entry.title)
         next_delivery_sensor = TMMNextDeliverySensor(coordinator, entry.title)
