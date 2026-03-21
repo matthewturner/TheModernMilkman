@@ -1,6 +1,6 @@
 """The Modren Milkman Coordinator."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import json
 from homeassistant.core import HomeAssistant
@@ -43,6 +43,7 @@ class TMMCoordinator(DataUpdateCoordinator):
             CONF_USERNAME: data[CONF_USERNAME],
             CONF_PASSWORD: data[CONF_PASSWORD],
         }
+        self.last_updated: datetime | None = None
 
     async def _async_update_data(self):
         """Fetch data from API endpoint."""
@@ -84,6 +85,7 @@ class TMMCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Unexpected exception: %s", err)
             raise UnknownError from err
         else:
+            self.last_updated = datetime.now(timezone.utc)
             return body
 
 

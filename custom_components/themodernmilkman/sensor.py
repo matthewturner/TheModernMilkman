@@ -124,6 +124,8 @@ class TMMNextDeliverySensor(CoordinatorEntity[DataUpdateCoordinator], SensorEnti
                     attributes[key] = value
 
         self.attrs = attributes
+        if self.coordinator.last_updated is not None:
+            self.attrs["last_updated"] = self.coordinator.last_updated.isoformat()
 
     def get_state(self) -> str | date:
         """Get entity state."""
@@ -222,6 +224,8 @@ class TMMProductSensor(CoordinatorEntity[DataUpdateCoordinator], SensorEntity):
                 self._item = items[self._index - 1]
                 self._state = self._item.get("productName")
                 self.attrs = dict(self._item)
+        if self.coordinator.last_updated is not None:
+            self.attrs["last_updated"] = self.coordinator.last_updated.isoformat()
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -316,6 +320,8 @@ class TMMWastageSensor(CoordinatorEntity[DataUpdateCoordinator], SensorEntity):
                 attributes[key] = value
 
         self.attrs = attributes
+        if self.coordinator.last_updated is not None:
+            self.attrs["last_updated"] = self.coordinator.last_updated.isoformat()
 
     @callback
     def _handle_coordinator_update(self) -> None:
