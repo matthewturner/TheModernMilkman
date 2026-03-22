@@ -17,5 +17,18 @@
                 }
             }
         }
+    },
+    "entity": {
+        "button": {
+            "themodernmilkman_refresh": {
+                "name": "Refresh"
+            }
+        }
+    },
+    "services": {
+        "refresh_data": {
+            "name": "Refresh data",
+            "description": "Manually refresh data from The Modern Milkman API."
+        }
     }
 }

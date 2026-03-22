@@ -1,0 +1,3 @@
+refresh_data:
+  name: Refresh data
+  description: Manually refresh data from The Modern Milkman API.
