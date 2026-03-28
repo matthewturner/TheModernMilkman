@@ -14,22 +14,12 @@ Enjoying this? Help me out with a :beers: or :coffee:!
 
 [![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/whenitworks)
 
-Additionally if you are looking to sign up to The Modern Milkman and use this integration it would be greatly appreicated if you used this referrer code at checkout.
+Additionally if you are looking to sign up to The Modern Milkman and use this integration it would be greatly appreciated if you used this referrer code at checkout.
 
 # `ANJU-1-16177E`
 
 
 ## Installation through [HACS](https://hacs.xyz/)
-
-There is an active [PR](https://github.com/hacs/default/pull/2768) to get this into [HACS](https://hacs.xyz/), once that is merged then you can install the **The Modern Milkman** integration by searching for it there in HA instance.
-
-Until then you will have to add this repository manually:
-
-Go to HACS -> 3 dot menu -> Custom Repositories:- 
-
-Paste `https://github.com/jampez77/TheModernMilkman` into Repository field and select `Integration`
-
-Now you should be able to find it in HACS as normal.
 
 You can install the **The Modern Milkman** integration by searching for it there in HA instance.
 
@@ -39,11 +29,16 @@ Use this route only if you do not want to use [HACS](https://hacs.xyz/) and love
 
 ---
 ## Data 
-This integration creates a sensor for your next milkround delivery date as well as information on number of milk bottles and wheelie bins saved. In addition you can add upcoming milkrounds to a calendar.
+This integration creates a sensor for your next milkround delivery including the following entities:
+* date
+* number of milk bottles and wheelie bins saved
+* products in delivery (first five only) 
+
+In addition you can add upcoming milkrounds to a calendar.
 
 ## Contributing
 
-Contirbutions are welcome from everyone! By contributing to this project, you help improve it and make it more useful for the community. Here's how you can get involved:
+Contributions are welcome from everyone! By contributing to this project, you help improve it and make it more useful for the community. Here's how you can get involved:
 
 ### How to Contribute
 
