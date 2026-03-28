@@ -23,6 +23,17 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def handle_status_code(status_code):
+    """Raise an appropriate exception for non-successful HTTP status codes.
+
+    Raises InvalidAuth for 401 responses and APIRatelimitExceeded for 429 responses.
+    """
+    if status_code == 401:
+        raise InvalidAuth("Invalid authentication credentials")
+    if status_code == 429:
+        raise APIRatelimitExceeded("API rate limit exceeded.")
+
+
 class TMMCoordinator(DataUpdateCoordinator):
     """The Modern Milkman coordinator."""
 
@@ -48,16 +59,20 @@ class TMMCoordinator(DataUpdateCoordinator):
         """Fetch data from API endpoint."""
         body = {}
         try:
-            await self.session.request(
+            login_resp = await self.session.request(
                 method="POST",
                 url=TMM_LOGIN_URL,
                 json=self.body,
                 headers=REQUEST_HEADER,
             )
 
+            handle_status_code(login_resp.status)
+
             wastageResp = await self.session.request(
                 method="GET", url=TMM_USER_WASTEAGE_URL
             )
+
+            handle_status_code(wastageResp.status)
 
             wastage = await wastageResp.text()
 
@@ -66,6 +81,8 @@ class TMMCoordinator(DataUpdateCoordinator):
             nextDeliveryResp = await self.session.request(
                 method="GET", url=TMM_NEXT_DELIVERY_URL
             )
+
+            handle_status_code(nextDeliveryResp.status)
 
             if nextDeliveryResp.status == 200:
                 nextDelivery = await nextDeliveryResp.text()
@@ -110,13 +127,6 @@ class TMMLoginCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch data from API endpoint."""
-
-        def handle_status_code(status_code):
-            """Handle status code."""
-            if status_code == 401:
-                raise InvalidAuth("Invalid authentication credentials")
-            if status_code == 429:
-                raise APIRatelimitExceeded("API rate limit exceeded.")
 
         try:
             if self.body is not None:
