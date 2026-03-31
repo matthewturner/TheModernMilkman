@@ -108,6 +108,8 @@ class TMMNextDeliverySensor(CoordinatorEntity[DataUpdateCoordinator], SensorEnti
     def update_from_coordinator(self):
         """Update sensor state and attributes from coordinator data."""
 
+        self.data = self.coordinator.data.get(CONF_NEXT_DELIVERY)
+
         self._state = self.get_state()
 
         attributes = {}
@@ -300,6 +302,8 @@ class TMMWastageSensor(CoordinatorEntity[DataUpdateCoordinator], SensorEntity):
 
     def update_from_coordinator(self):
         """Update sensor state and attributes from coordinator data."""
+
+        self.data = self.coordinator.data.get(CONF_WASTAGE)
 
         self._state = self.data[CONF_BOTTLESSAVED]
 
