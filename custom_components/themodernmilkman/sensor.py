@@ -53,7 +53,7 @@ async def async_setup_entry(
         next_delivery = coordinator.data.get(CONF_NEXT_DELIVERY)
         if next_delivery and next_delivery != CONF_UNKNOWN:
             items = next_delivery.get(CONF_ITEMS, [])
-            for index, item in enumerate(items[:5], start=1):
+            for index, item in enumerate(items, start=1):
                 product_sensor = TMMProductSensor(coordinator, entry.title, index, item)
                 sensors.append(product_sensor)
 
@@ -61,6 +61,29 @@ async def async_setup_entry(
             hass.data[DOMAIN][sensor.unique_id] = sensor
 
         async_add_entities(sensors, update_before_add=True)
+
+        @callback
+        def _async_add_new_product_sensors() -> None:
+            """Add product sensors for any new products in the coordinator data."""
+            next_del = coordinator.data.get(CONF_NEXT_DELIVERY)
+            if not next_del or next_del == CONF_UNKNOWN:
+                return
+            items = next_del.get(CONF_ITEMS, [])
+            new_sensors = []
+            for index, item in enumerate(items, start=1):
+                unique_id = f"{DOMAIN}-{entry.title}-product_{index}".lower()
+                if unique_id not in hass.data[DOMAIN]:
+                    product_sensor = TMMProductSensor(
+                        coordinator, entry.title, index, item
+                    )
+                    hass.data[DOMAIN][product_sensor.unique_id] = product_sensor
+                    new_sensors.append(product_sensor)
+            if new_sensors:
+                async_add_entities(new_sensors, update_before_add=True)
+
+        entry.async_on_unload(
+            coordinator.async_add_listener(_async_add_new_product_sensors)
+        )
 
 
 class TMMNextDeliverySensor(CoordinatorEntity[DataUpdateCoordinator], SensorEntity):
