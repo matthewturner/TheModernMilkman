@@ -162,6 +162,42 @@ def test_product_sensor_update_from_coordinator_reflects_new_product():
     assert sensor.native_value == "Whole Milk"
 
 
+def test_product_sensor_becomes_unavailable_when_product_removed():
+    """When products decrease, sensors beyond the new count become unavailable."""
+    items = [{"productName": "Milk"}, {"productName": "Yogurt"}]
+    coordinator = _make_coordinator(
+        {"deliveryDate": "2026-04-01", CONF_ITEMS: items}
+    )
+    sensor = TMMProductSensor(coordinator, "Test", 2, items[1])
+
+    assert sensor.native_value == "Yogurt"
+    assert sensor.available
+
+    # Product list shrinks to one item — sensor 2 should become unavailable
+    coordinator.data[CONF_NEXT_DELIVERY][CONF_ITEMS] = [{"productName": "Milk"}]
+    sensor.update_from_coordinator()
+
+    assert sensor.native_value is None
+    assert not sensor.available
+
+
+def test_product_sensor_becomes_unavailable_when_no_delivery():
+    """When no delivery is scheduled, product sensors become unavailable."""
+    item = {"productName": "Milk"}
+    coordinator = _make_coordinator(
+        {"deliveryDate": "2026-04-01", CONF_ITEMS: [item]}
+    )
+    sensor = TMMProductSensor(coordinator, "Test", 1, item)
+
+    assert sensor.available
+
+    coordinator.data[CONF_NEXT_DELIVERY] = CONF_UNKNOWN
+    sensor.update_from_coordinator()
+
+    assert sensor.native_value is None
+    assert not sensor.available
+
+
 # ---------------------------------------------------------------------------
 # async_setup_entry dynamic product sensor tests
 # ---------------------------------------------------------------------------

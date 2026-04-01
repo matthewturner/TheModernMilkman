@@ -243,6 +243,14 @@ class TMMProductSensor(CoordinatorEntity[DataUpdateCoordinator], SensorEntity):
                 self._item = items[self._index - 1]
                 self._state = self._item.get("productName")
                 self.attrs = dict(self._item)
+            else:
+                self._item = None
+                self._state = None
+                self.attrs = {}
+        else:
+            self._item = None
+            self._state = None
+            self.attrs = {}
 
     @callback
     def _handle_coordinator_update(self) -> None:
