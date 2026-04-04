@@ -123,7 +123,6 @@ async def get_event_uid(hass: HomeAssistant, service_data) -> str | None:
                 and event_loc == str(service_data["location"])
             ):
                 return generate_uuid_from_json(service_data)
-                return generate_uuid_from_json(service_data)
 
     return None
 
