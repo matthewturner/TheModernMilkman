@@ -47,7 +47,7 @@ async def async_setup_entry(
             for sensor in sensors:
                 next_event = sensor.get_event(datetime.today())
                 if next_event is not None:
-                    await add_to_calendar(hass, calendar, event, entry)
+                    await add_to_calendar(hass, calendar, next_event, entry)
 
     if "None" in calendars:
         async_add_entities(sensors, update_before_add=True)
@@ -208,7 +208,7 @@ class TMMCalendarSensor(CoordinatorEntity[TMMCoordinator], CalendarEntity):
     ) -> list[CalendarEvent]:
         """Return calendar events within a datetime range."""
         event = self.get_event(start_date)
-        if event.start <= end_date.date():
+        if event is not None and event.start <= end_date.date():
             return [event]
 
         return []
