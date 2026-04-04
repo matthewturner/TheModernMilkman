@@ -45,9 +45,9 @@ async def async_setup_entry(
     for calendar in calendars:
         if calendar != "None":
             for sensor in sensors:
-                events = sensor.get_events(datetime.today(), entry.title)
-                for event in events:
-                    await add_to_calendar(hass, calendar, event, entry)
+                next_event = sensor.get_event(datetime.today())
+                if next_event is not None:
+                    await add_to_calendar(hass, calendar, next_event, entry)
 
     if "None" in calendars:
         async_add_entities(sensors, update_before_add=True)
@@ -117,8 +117,8 @@ async def get_event_uid(hass: HomeAssistant, service_data) -> str | None:
         for event in events[entity_id].get("events"):
             if (
                 event["summary"] == service_data["summary"]
-                and f"{event["description"]}" == f"{service_data["description"]}"
-                and f"{event["location"]}" == f"{service_data["location"]}"
+                and event["description"] == service_data["description"]
+                and event["location"] == service_data["location"]
             ):
                 return generate_uuid_from_json(service_data)
 
@@ -208,7 +208,7 @@ class TMMCalendarSensor(CoordinatorEntity[TMMCoordinator], CalendarEntity):
     ) -> list[CalendarEvent]:
         """Return calendar events within a datetime range."""
         event = self.get_event(start_date)
-        if event.start <= end_date.date():
+        if event is not None and event.start <= end_date.date():
             return [event]
 
         return []
