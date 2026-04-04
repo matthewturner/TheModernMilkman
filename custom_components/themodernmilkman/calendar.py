@@ -115,11 +115,14 @@ async def get_event_uid(hass: HomeAssistant, service_data) -> str | None:
 
     if events is not None and entity_id in events:
         for event in events[entity_id].get("events"):
+            event_desc = str(event.get("description"))
+            event_loc = str(event.get("location"))
             if (
                 event["summary"] == service_data["summary"]
-                and f"{event["description"]}" == f"{service_data["description"]}"
-                and f"{event["location"]}" == f"{service_data["location"]}"
+                and event_desc == str(service_data["description"])
+                and event_loc == str(service_data["location"])
             ):
+                return generate_uuid_from_json(service_data)
                 return generate_uuid_from_json(service_data)
 
     return None
