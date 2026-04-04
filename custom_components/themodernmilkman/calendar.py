@@ -45,7 +45,8 @@ async def async_setup_entry(
     for calendar in calendars:
         if calendar != "None":
             for sensor in sensors:
-                events = sensor.get_events(datetime.today(), entry.title)
+                next_event = sensor.get_event(datetime.today())
+                events = [next_event] if next_event is not None else []
                 for event in events:
                     await add_to_calendar(hass, calendar, event, entry)
 
