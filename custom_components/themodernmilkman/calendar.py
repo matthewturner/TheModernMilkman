@@ -117,8 +117,8 @@ async def get_event_uid(hass: HomeAssistant, service_data) -> str | None:
         for event in events[entity_id].get("events"):
             if (
                 event["summary"] == service_data["summary"]
-                and event.get("description") == service_data["description"]
-                and event.get("location") == service_data["location"]
+                and event["description"] == service_data["description"]
+                and event["location"] == service_data["location"]
             ):
                 return generate_uuid_from_json(service_data)
 
