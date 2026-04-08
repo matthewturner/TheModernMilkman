@@ -38,7 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def _async_refresh_data(call: ServiceCall) -> None:
         """Manually refresh data from The Modern Milkman API."""
-        for entry_id, entry_data in hass.data[DOMAIN].items():
+        for entry_id, entry_data in list(hass.data[DOMAIN].items()):
             if isinstance(entry_data, dict):
                 coord = entry_data.get(CONF_COORDINATOR)
                 if coord:
