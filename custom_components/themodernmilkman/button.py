@@ -18,6 +18,11 @@ from .const import (
 from .coordinator import TMMCoordinator
 
 
+def _pause_button_unique_id(name: str, index: int) -> str:
+    """Build a stable unique ID for a product pause button."""
+    return f"{DOMAIN}-{name}-product_{index}_pause".lower()
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -51,7 +56,7 @@ async def async_setup_entry(
         for index, item in enumerate(items, start=1):
             if item.get("subscriptionItemId") is None:
                 continue
-            unique_id = f"{DOMAIN}-{entry.title}-product_{index}_pause".lower()
+            unique_id = _pause_button_unique_id(entry.title, index)
             if unique_id not in hass.data[DOMAIN]:
                 pause_button = TMMPauseProductButton(coordinator, entry.title, index, item)
                 hass.data[DOMAIN][pause_button.unique_id] = pause_button
@@ -99,6 +104,7 @@ class TMMPauseProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
         super().__init__(coordinator)
         self._index = index
         self._item = item
+        product_name = item.get("productName", f"Product {index}")
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{DOMAIN}")},
             manufacturer="The Modern Milkman",
@@ -106,11 +112,11 @@ class TMMPauseProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
             name=name,
             configuration_url="https://github.com/jampez77/TheModernMilkman/",
         )
-        self._attr_unique_id = f"{DOMAIN}-{name}-product_{index}_pause".lower()
+        self._attr_unique_id = _pause_button_unique_id(name, index)
         self.entity_id = f"button.{DOMAIN}_product_{index}_pause"
         self.entity_description = ButtonEntityDescription(
             key=f"themodernmilkman_product_{index}_pause",
-            name=f"Pause Product {index}",
+            name=f"Pause {product_name}",
             icon="mdi:pause-circle",
         )
 
