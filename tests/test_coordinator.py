@@ -14,6 +14,7 @@ from custom_components.themodernmilkman.coordinator import (
     handle_status_code,
 )
 from custom_components.themodernmilkman.const import (
+    CONF_DELIVERYDATE,
     CONF_NEXT_DELIVERY,
     CONF_UNKNOWN,
     CONF_WASTAGE,
@@ -187,3 +188,40 @@ async def test_update_data_wastage_429_raises_update_failed(hass):
 
     with pytest.raises(UpdateFailed):
         await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_skip_subscription_item_posts_expected_payload(hass):
+    """Pause request posts next delivery date, reason, and subscription item ID."""
+    coordinator = _make_coordinator(hass)
+    coordinator.data = {
+        CONF_NEXT_DELIVERY: {
+            CONF_DELIVERYDATE: "2026-04-16T00:00:00.000Z",
+        }
+    }
+    coordinator.session.request = AsyncMock(return_value=_make_response(200))
+    coordinator.async_request_refresh = AsyncMock()
+
+    await coordinator.async_skip_subscription_item(9320404)
+
+    coordinator.session.request.assert_awaited_once_with(
+        method="POST",
+        url="https://themodernmilkman.co.uk/api/subscriptions/skip",
+        json={
+            "skipDate": "2026-04-16",
+            "pauseReasonId": 5,
+            "subscriptionItemIds": [9320404],
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    coordinator.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_skip_subscription_item_raises_when_no_next_delivery(hass):
+    """Pause request fails when there is no next delivery data."""
+    coordinator = _make_coordinator(hass)
+    coordinator.data = {CONF_NEXT_DELIVERY: CONF_UNKNOWN}
+
+    with pytest.raises(UpdateFailed, match="No next delivery"):
+        await coordinator.async_skip_subscription_item(9320404)
