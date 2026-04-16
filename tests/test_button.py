@@ -4,7 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.themodernmilkman.button import (
-    TMMPauseProductButton,
+    TMMSkipProductButton,
     TMMRefreshButton,
     async_setup_entry,
 )
@@ -53,8 +53,8 @@ def _make_setup_mocks(initial_items):
     return hass, coordinator, add_calls, lambda: registered_listener
 
 
-def test_async_setup_entry_adds_refresh_and_pause_buttons():
-    """Setup adds a refresh button and one pause button per product item."""
+def test_async_setup_entry_adds_refresh_and_skip_buttons():
+    """Setup adds a refresh button and one skip button per product item."""
     items = [
         {"productName": "Milk", "subscriptionItemId": 9320404},
         {"productName": "Bread", "subscriptionItemId": 9320405},
@@ -63,11 +63,11 @@ def test_async_setup_entry_adds_refresh_and_pause_buttons():
 
     assert len(add_calls) == 1
     assert sum(isinstance(entity, TMMRefreshButton) for entity in add_calls[0]) == 1
-    assert sum(isinstance(entity, TMMPauseProductButton) for entity in add_calls[0]) == 2
+    assert sum(isinstance(entity, TMMSkipProductButton) for entity in add_calls[0]) == 2
 
 
-def test_async_setup_entry_listener_adds_new_pause_button():
-    """Listener adds pause buttons for newly added products."""
+def test_async_setup_entry_listener_adds_new_skip_button():
+    """Listener adds skip buttons for newly added products."""
     initial_items = [{"productName": "Milk", "subscriptionItemId": 9320404}]
     _, coordinator, add_calls, get_listener = _make_setup_mocks(initial_items)
 
@@ -79,11 +79,11 @@ def test_async_setup_entry_listener_adds_new_pause_button():
 
     assert len(add_calls) == 2
     assert len(add_calls[1]) == 1
-    assert isinstance(add_calls[1][0], TMMPauseProductButton)
+    assert isinstance(add_calls[1][0], TMMSkipProductButton)
 
 
-def test_pause_button_press_calls_skip_api_with_subscription_item_id():
-    """Pressing a pause button calls coordinator skip with the product item ID."""
+def test_skip_button_press_calls_skip_api_with_subscription_item_id():
+    """Pressing a skip button calls coordinator skip with the product item ID."""
     coordinator = MagicMock()
     coordinator.last_update_success = True
     coordinator.async_skip_subscription_item = AsyncMock()
@@ -92,7 +92,7 @@ def test_pause_button_press_calls_skip_api_with_subscription_item_id():
             CONF_ITEMS: [{"productName": "Milk", "subscriptionItemId": 9320404}]
         }
     }
-    button = TMMPauseProductButton(
+    button = TMMSkipProductButton(
         coordinator,
         "Test",
         1,

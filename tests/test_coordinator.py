@@ -192,7 +192,7 @@ async def test_update_data_wastage_429_raises_update_failed(hass):
 
 @pytest.mark.asyncio
 async def test_skip_subscription_item_posts_expected_payload(hass):
-    """Pause request posts next delivery date, reason, and subscription item ID."""
+    """Skip request posts next delivery date, reason, and subscription item ID."""
     coordinator = _make_coordinator(hass)
     coordinator.data = {
         CONF_NEXT_DELIVERY: {
@@ -219,7 +219,7 @@ async def test_skip_subscription_item_posts_expected_payload(hass):
 
 @pytest.mark.asyncio
 async def test_skip_subscription_item_raises_when_no_next_delivery(hass):
-    """Pause request fails when there is no next delivery data."""
+    """Skip request fails when there is no next delivery data."""
     coordinator = _make_coordinator(hass)
     coordinator.data = {CONF_NEXT_DELIVERY: CONF_UNKNOWN}
 

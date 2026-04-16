@@ -105,10 +105,10 @@ class TMMCoordinator(DataUpdateCoordinator):
             return body
 
     async def async_skip_subscription_item(self, subscription_item_id: int) -> None:
-        """Pause a subscription item on the next delivery date."""
+        """Skip a subscription item on the next delivery date."""
         next_delivery = self.data.get(CONF_NEXT_DELIVERY)
         if not next_delivery or next_delivery == CONF_UNKNOWN:
-            raise UpdateFailed("No next delivery available to pause")
+            raise UpdateFailed("No next delivery available to skip")
 
         skip_date_raw = next_delivery.get(CONF_DELIVERYDATE)
         if not skip_date_raw:
@@ -131,7 +131,7 @@ class TMMCoordinator(DataUpdateCoordinator):
 
         handle_status_code(response.status)
         if response.status not in (200, 201, 204):
-            raise UpdateFailed(f"Unable to pause subscription item: {response.status}")
+            raise UpdateFailed(f"Unable to skip subscription item: {response.status}")
 
         await self.async_request_refresh()
 
