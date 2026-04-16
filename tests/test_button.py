@@ -99,6 +99,8 @@ def test_skip_button_press_calls_skip_api_with_subscription_item_id():
         {"productName": "Milk", "subscriptionItemId": 9320404},
     )
 
+    assert button.entity_description.name == "Skip Product 1"
+
     asyncio.run(button.async_press())
 
     coordinator.async_skip_subscription_item.assert_awaited_once_with(9320404)

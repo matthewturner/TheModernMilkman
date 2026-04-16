@@ -104,7 +104,6 @@ class TMMSkipProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
         super().__init__(coordinator)
         self._index = index
         self._item = item
-        product_name = item.get("productName", f"Product {index}")
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{DOMAIN}")},
             manufacturer="The Modern Milkman",
@@ -116,7 +115,7 @@ class TMMSkipProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
         self.entity_id = f"button.{DOMAIN}_product_{index}_skip"
         self.entity_description = ButtonEntityDescription(
             key=f"themodernmilkman_product_{index}_skip",
-            name=f"Skip {product_name}",
+            name=f"Skip Product {index}",
             icon="mdi:skip-next-circle",
         )
 
