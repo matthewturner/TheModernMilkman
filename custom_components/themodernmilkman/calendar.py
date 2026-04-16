@@ -1,6 +1,6 @@
 """The Modern Milkman calendar platform."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import hashlib
 import json
 import uuid
@@ -8,7 +8,7 @@ import uuid
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -51,6 +51,33 @@ async def async_setup_entry(
 
     if "None" in calendars:
         async_add_entities(sensors, update_before_add=True)
+
+    async def _async_update_external_calendars() -> None:
+        """Update external calendars with the latest delivery event."""
+        if not coordinator.data:
+            return
+        next_delivery = coordinator.data.get(CONF_NEXT_DELIVERY)
+        if next_delivery is None or next_delivery == CONF_UNKNOWN:
+            return
+        delivery_date_str = next_delivery.get(CONF_DELIVERYDATE)
+        if not delivery_date_str:
+            return
+        try:
+            delivery_date = datetime.fromisoformat(delivery_date_str).date()
+        except ValueError:
+            return
+        if delivery_date < datetime.today().date():
+            return
+        event = CalendarEvent(delivery_date, delivery_date, "Milkround")
+        for calendar_id in calendars:
+            if calendar_id != "None":
+                await add_to_calendar(hass, calendar_id, event, entry)
+
+    @callback
+    def _handle_coordinator_update() -> None:
+        hass.async_create_task(_async_update_external_calendars())
+
+    entry.async_on_unload(coordinator.async_add_listener(_handle_coordinator_update))
 
 
 async def create_event(hass: HomeAssistant, service_data):
@@ -105,7 +132,7 @@ async def get_event_uid(hass: HomeAssistant, service_data) -> str | None:
             {
                 "entity_id": entity_id,
                 "start_date_time": f"{start_time}T00:00:00+0000",
-                "end_date_time": f"{end_time}T00:00:00+0000",
+                "end_date_time": f"{start_time + timedelta(days=1)}T00:00:00+0000",
             },
             return_response=True,
             blocking=True,
