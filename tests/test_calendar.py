@@ -8,6 +8,7 @@ import pytest
 
 from custom_components.themodernmilkman.calendar import (
     TMMCalendarSensor,
+    _get_next_delivery_event,
     add_to_calendar,
     async_setup_entry,
     generate_uuid_from_json,
@@ -700,3 +701,44 @@ async def test_get_event_uid_queries_full_day_window():
 
     assert captured_call.get("start_date_time") == "2099-06-15T00:00:00+0000"
     assert captured_call.get("end_date_time") == "2099-06-16T00:00:00+0000"
+
+    # Also verify that a matching event produces the expected UUID
+    result = await get_event_uid(hass, service_data)
+    assert result == generate_uuid_from_json(service_data)
+
+
+# ---------------------------------------------------------------------------
+# _get_next_delivery_event
+# ---------------------------------------------------------------------------
+
+
+def test_get_next_delivery_event_returns_event_for_future_date():
+    """Returns a CalendarEvent when the delivery is in the future."""
+    data = {CONF_NEXT_DELIVERY: {CONF_DELIVERYDATE: "2099-12-31"}}
+    event = _get_next_delivery_event(data)
+    assert event is not None
+    assert event.start == date(2099, 12, 31)
+    assert event.summary == "Milkround"
+
+
+def test_get_next_delivery_event_returns_none_for_past_date():
+    """Returns None when the delivery date is in the past."""
+    data = {CONF_NEXT_DELIVERY: {CONF_DELIVERYDATE: "2000-01-01"}}
+    assert _get_next_delivery_event(data) is None
+
+
+def test_get_next_delivery_event_returns_none_when_no_data():
+    """Returns None when coordinator_data is empty."""
+    assert _get_next_delivery_event({}) is None
+
+
+def test_get_next_delivery_event_returns_none_when_unknown():
+    """Returns None when next delivery is CONF_UNKNOWN."""
+    data = {CONF_NEXT_DELIVERY: CONF_UNKNOWN}
+    assert _get_next_delivery_event(data) is None
+
+
+def test_get_next_delivery_event_returns_none_for_invalid_date():
+    """Returns None when the delivery date string cannot be parsed."""
+    data = {CONF_NEXT_DELIVERY: {CONF_DELIVERYDATE: "not-a-date"}}
+    assert _get_next_delivery_event(data) is None

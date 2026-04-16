@@ -25,6 +25,25 @@ from .const import (
 )
 
 
+def _get_next_delivery_event(coordinator_data: dict) -> CalendarEvent | None:
+    """Return the next delivery CalendarEvent from coordinator data, or None."""
+    if not coordinator_data:
+        return None
+    next_delivery = coordinator_data.get(CONF_NEXT_DELIVERY)
+    if next_delivery is None or next_delivery == CONF_UNKNOWN:
+        return None
+    delivery_date_str = next_delivery.get(CONF_DELIVERYDATE)
+    if not delivery_date_str:
+        return None
+    try:
+        delivery_date = datetime.fromisoformat(delivery_date_str).date()
+    except ValueError:
+        return None
+    if delivery_date < datetime.today().date():
+        return None
+    return CalendarEvent(delivery_date, delivery_date, "Milkround")
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -42,33 +61,20 @@ async def async_setup_entry(
 
     sensors = [TMMCalendarSensor(coordinator, entry.title)]
 
-    for calendar in calendars:
-        if calendar != "None":
-            for sensor in sensors:
-                next_event = sensor.get_event(datetime.today())
-                if next_event is not None:
-                    await add_to_calendar(hass, calendar, next_event, entry)
+    next_event = _get_next_delivery_event(coordinator.data)
+    if next_event is not None:
+        for calendar_id in calendars:
+            if calendar_id != "None":
+                await add_to_calendar(hass, calendar_id, next_event, entry)
 
     if "None" in calendars:
         async_add_entities(sensors, update_before_add=True)
 
     async def _async_update_external_calendars() -> None:
         """Update external calendars with the latest delivery event."""
-        if not coordinator.data:
+        event = _get_next_delivery_event(coordinator.data)
+        if event is None:
             return
-        next_delivery = coordinator.data.get(CONF_NEXT_DELIVERY)
-        if next_delivery is None or next_delivery == CONF_UNKNOWN:
-            return
-        delivery_date_str = next_delivery.get(CONF_DELIVERYDATE)
-        if not delivery_date_str:
-            return
-        try:
-            delivery_date = datetime.fromisoformat(delivery_date_str).date()
-        except ValueError:
-            return
-        if delivery_date < datetime.today().date():
-            return
-        event = CalendarEvent(delivery_date, delivery_date, "Milkround")
         for calendar_id in calendars:
             if calendar_id != "None":
                 await add_to_calendar(hass, calendar_id, event, entry)
