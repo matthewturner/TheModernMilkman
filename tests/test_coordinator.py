@@ -216,7 +216,7 @@ async def test_skip_subscription_item_posts_expected_payload(hass):
             ),
             call(
                 method="POST",
-                url="https://themodernmilkman.co.uk/api/subscriptions/skip",
+                url="https://tmm-website-xi.vercel.app/api/subscriptions/skip",
                 json={
                     "skipDate": "2026-04-16",
                     "pauseReasonId": 5,
