@@ -60,14 +60,7 @@ class TMMCoordinator(DataUpdateCoordinator):
         """Fetch data from API endpoint."""
         body = {}
         try:
-            login_resp = await self.session.request(
-                method="POST",
-                url=TMM_LOGIN_URL,
-                json=self.body,
-                headers=REQUEST_HEADER,
-            )
-
-            handle_status_code(login_resp.status)
+            await self._async_login()
 
             wastageResp = await self.session.request(
                 method="GET", url=TMM_USER_WASTEAGE_URL
