@@ -122,6 +122,8 @@ class TMMCoordinator(DataUpdateCoordinator):
             "subscriptionItemIds": [subscription_item_id],
         }
 
+        await self._async_login()
+
         response = await self.session.request(
             method="POST",
             url=TMM_SKIP_SUBSCRIPTION_URL,
@@ -129,11 +131,30 @@ class TMMCoordinator(DataUpdateCoordinator):
             headers=REQUEST_HEADER,
         )
 
+        if response.status == 401:
+            await self._async_login()
+            response = await self.session.request(
+                method="POST",
+                url=TMM_SKIP_SUBSCRIPTION_URL,
+                json=payload,
+                headers=REQUEST_HEADER,
+            )
+
         handle_status_code(response.status)
         if response.status not in (200, 201, 204):
             raise UpdateFailed(f"Unable to skip subscription item: {response.status}")
 
         await self.async_request_refresh()
+
+    async def _async_login(self):
+        """Authenticate the current session using cached credentials."""
+        login_resp = await self.session.request(
+            method="POST",
+            url=TMM_LOGIN_URL,
+            json=self.body,
+            headers=REQUEST_HEADER,
+        )
+        handle_status_code(login_resp.status)
 
     @staticmethod
     def _normalise_skip_date(raw_value: str) -> str:
