@@ -8,6 +8,7 @@ import pytest
 
 from custom_components.themodernmilkman.calendar import (
     TMMCalendarSensor,
+    _get_next_delivery_event,
     add_to_calendar,
     async_setup_entry,
     generate_uuid_from_json,
@@ -507,3 +508,237 @@ def test_async_setup_entry_handles_both_none_and_external_calendars():
 
     assert len(add_calls) == 1  # HA entity registered
     mock_add.assert_called_once()  # external calendar populated
+
+
+def test_async_setup_entry_registers_coordinator_listener():
+    """async_setup_entry registers a coordinator listener for future refreshes."""
+    hass, entry, coordinator = _make_setup_mocks(["calendar.google"])
+
+    with patch(
+        "custom_components.themodernmilkman.calendar.add_to_calendar",
+        new_callable=AsyncMock,
+    ):
+        asyncio.run(async_setup_entry(hass, entry, MagicMock()))
+
+    coordinator.async_add_listener.assert_called_once()
+    entry.async_on_unload.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_listener_calls_add_to_calendar_on_refresh():
+    """Coordinator listener calls add_to_calendar when coordinator data is updated."""
+    hass, entry, coordinator = _make_setup_mocks(["calendar.google"])
+
+    captured_listener = None
+
+    def capture_listener(listener):
+        nonlocal captured_listener
+        captured_listener = listener
+        return MagicMock()  # unsubscribe function
+
+    coordinator.async_add_listener.side_effect = capture_listener
+
+    tasks = []
+    hass.async_create_task.side_effect = lambda coro: tasks.append(coro)
+
+    with patch(
+        "custom_components.themodernmilkman.calendar.add_to_calendar",
+        new_callable=AsyncMock,
+    ) as mock_add:
+        await async_setup_entry(hass, entry, MagicMock())
+
+        assert captured_listener is not None
+
+        # Simulate coordinator refresh by invoking the listener
+        captured_listener()
+
+        assert len(tasks) == 1
+        await tasks[0]
+
+        # add_to_calendar should have been called during setup and on the refresh
+        assert mock_add.call_count == 2
+        call_args = mock_add.call_args
+        assert call_args[0][1] == "calendar.google"
+        assert isinstance(call_args[0][2], CalendarEvent)
+
+
+@pytest.mark.asyncio
+async def test_coordinator_listener_skips_update_when_no_data():
+    """Coordinator listener does nothing when coordinator has no data."""
+    hass, entry, coordinator = _make_setup_mocks(["calendar.google"])
+
+    captured_listener = None
+
+    def capture_listener(listener):
+        nonlocal captured_listener
+        captured_listener = listener
+        return MagicMock()
+
+    coordinator.async_add_listener.side_effect = capture_listener
+
+    tasks = []
+    hass.async_create_task.side_effect = lambda coro: tasks.append(coro)
+
+    with patch(
+        "custom_components.themodernmilkman.calendar.add_to_calendar",
+        new_callable=AsyncMock,
+    ) as mock_add:
+        await async_setup_entry(hass, entry, MagicMock())
+
+        mock_add.reset_mock()
+
+        # Simulate coordinator losing its data before the next refresh
+        coordinator.data = {}
+
+        captured_listener()
+        assert len(tasks) == 1
+        await tasks[0]
+
+        mock_add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_listener_skips_update_when_past_delivery():
+    """Coordinator listener does not create event for past delivery dates."""
+    hass, entry, coordinator = _make_setup_mocks(
+        ["calendar.google"], delivery_date="2000-01-01"
+    )
+
+    captured_listener = None
+
+    def capture_listener(listener):
+        nonlocal captured_listener
+        captured_listener = listener
+        return MagicMock()
+
+    coordinator.async_add_listener.side_effect = capture_listener
+
+    tasks = []
+    hass.async_create_task.side_effect = lambda coro: tasks.append(coro)
+
+    with patch(
+        "custom_components.themodernmilkman.calendar.add_to_calendar",
+        new_callable=AsyncMock,
+    ) as mock_add:
+        await async_setup_entry(hass, entry, MagicMock())
+
+        mock_add.reset_mock()
+
+        captured_listener()
+        assert len(tasks) == 1
+        await tasks[0]
+
+        mock_add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_listener_skips_update_when_unknown_delivery():
+    """Coordinator listener does not create event when delivery is CONF_UNKNOWN."""
+    hass, entry, coordinator = _make_setup_mocks(["calendar.google"])
+
+    captured_listener = None
+
+    def capture_listener(listener):
+        nonlocal captured_listener
+        captured_listener = listener
+        return MagicMock()
+
+    coordinator.async_add_listener.side_effect = capture_listener
+
+    tasks = []
+    hass.async_create_task.side_effect = lambda coro: tasks.append(coro)
+
+    with patch(
+        "custom_components.themodernmilkman.calendar.add_to_calendar",
+        new_callable=AsyncMock,
+    ) as mock_add:
+        await async_setup_entry(hass, entry, MagicMock())
+
+        mock_add.reset_mock()
+
+        # Simulate coordinator returning unknown delivery on the next refresh
+        coordinator.data = {CONF_NEXT_DELIVERY: CONF_UNKNOWN}
+
+        captured_listener()
+        assert len(tasks) == 1
+        await tasks[0]
+
+        mock_add.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# get_event_uid – time window
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_event_uid_queries_full_day_window():
+    """get_event_uid uses a full-day time window (start to start+1 day) when querying."""
+    service_data = {
+        "entity_id": "calendar.test",
+        "start_date": date(2099, 6, 15),
+        "end_date": date(2099, 6, 15),
+        "summary": "Milkround",
+        "description": "desc",
+        "location": "loc",
+    }
+    captured_call = {}
+
+    async def capture_async_call(domain, service, data, **kwargs):
+        captured_call.update(data)
+        return {
+            "calendar.test": {
+                "events": [
+                    {"summary": "Milkround", "description": "desc", "location": "loc"}
+                ]
+            }
+        }
+
+    hass = MagicMock()
+    hass.services.async_call = capture_async_call
+
+    await get_event_uid(hass, service_data)
+
+    assert captured_call.get("start_date_time") == "2099-06-15T00:00:00+0000"
+    assert captured_call.get("end_date_time") == "2099-06-16T00:00:00+0000"
+
+    # Also verify that a matching event produces the expected UUID
+    result = await get_event_uid(hass, service_data)
+    assert result == generate_uuid_from_json(service_data)
+
+
+# ---------------------------------------------------------------------------
+# _get_next_delivery_event
+# ---------------------------------------------------------------------------
+
+
+def test_get_next_delivery_event_returns_event_for_future_date():
+    """Returns a CalendarEvent when the delivery is in the future."""
+    data = {CONF_NEXT_DELIVERY: {CONF_DELIVERYDATE: "2099-12-31"}}
+    event = _get_next_delivery_event(data)
+    assert event is not None
+    assert event.start == date(2099, 12, 31)
+    assert event.summary == "Milkround"
+
+
+def test_get_next_delivery_event_returns_none_for_past_date():
+    """Returns None when the delivery date is in the past."""
+    data = {CONF_NEXT_DELIVERY: {CONF_DELIVERYDATE: "2000-01-01"}}
+    assert _get_next_delivery_event(data) is None
+
+
+def test_get_next_delivery_event_returns_none_when_no_data():
+    """Returns None when coordinator_data is empty."""
+    assert _get_next_delivery_event({}) is None
+
+
+def test_get_next_delivery_event_returns_none_when_unknown():
+    """Returns None when next delivery is CONF_UNKNOWN."""
+    data = {CONF_NEXT_DELIVERY: CONF_UNKNOWN}
+    assert _get_next_delivery_event(data) is None
+
+
+def test_get_next_delivery_event_returns_none_for_invalid_date():
+    """Returns None when the delivery date string cannot be parsed."""
+    data = {CONF_NEXT_DELIVERY: {CONF_DELIVERYDATE: "not-a-date"}}
+    assert _get_next_delivery_event(data) is None

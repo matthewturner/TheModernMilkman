@@ -1,7 +1,7 @@
 """Tests for The Modern Milkman coordinator."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -14,6 +14,7 @@ from custom_components.themodernmilkman.coordinator import (
     handle_status_code,
 )
 from custom_components.themodernmilkman.const import (
+    CONF_DELIVERYDATE,
     CONF_NEXT_DELIVERY,
     CONF_UNKNOWN,
     CONF_WASTAGE,
@@ -187,3 +188,77 @@ async def test_update_data_wastage_429_raises_update_failed(hass):
 
     with pytest.raises(UpdateFailed):
         await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_skip_subscription_item_posts_expected_payload(hass):
+    """Skip request posts next delivery date, reason, and subscription item ID."""
+    coordinator = _make_coordinator(hass)
+    coordinator.data = {
+        CONF_NEXT_DELIVERY: {
+            CONF_DELIVERYDATE: "2026-04-16T00:00:00.000Z",
+        }
+    }
+    coordinator.session.request = AsyncMock(
+        side_effect=[_make_response(200), _make_response(200)]
+    )
+    coordinator.async_request_refresh = AsyncMock()
+
+    await coordinator.async_skip_subscription_item(9320404)
+
+    coordinator.session.request.assert_has_awaits(
+        [
+            call(
+                method="POST",
+                url="https://tmm-website-xi.vercel.app/api/auth/login",
+                json={"username": "user@example.com", "password": "secret"},
+                headers={"Content-Type": "application/json"},
+            ),
+            call(
+                method="POST",
+                url="https://tmm-website-xi.vercel.app/api/subscriptions/skip",
+                json={
+                    "skipDate": "2026-04-16",
+                    "pauseReasonId": 5,
+                    "subscriptionItemIds": [9320404],
+                },
+                headers={"Content-Type": "application/json"},
+            ),
+        ]
+    )
+    coordinator.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_skip_subscription_item_raises_when_no_next_delivery(hass):
+    """Skip request fails when there is no next delivery data."""
+    coordinator = _make_coordinator(hass)
+    coordinator.data = {CONF_NEXT_DELIVERY: CONF_UNKNOWN}
+
+    with pytest.raises(UpdateFailed, match="No next delivery"):
+        await coordinator.async_skip_subscription_item(9320404)
+
+
+@pytest.mark.asyncio
+async def test_skip_subscription_item_reauthenticates_and_retries_on_401(hass):
+    """Skip request re-authenticates and retries once when credentials have expired."""
+    coordinator = _make_coordinator(hass)
+    coordinator.data = {
+        CONF_NEXT_DELIVERY: {
+            CONF_DELIVERYDATE: "2026-04-16T00:00:00.000Z",
+        }
+    }
+    coordinator.session.request = AsyncMock(
+        side_effect=[
+            _make_response(200),  # initial login
+            _make_response(401),  # first skip call with expired auth
+            _make_response(200),  # re-login
+            _make_response(200),  # retried skip call
+        ]
+    )
+    coordinator.async_request_refresh = AsyncMock()
+
+    await coordinator.async_skip_subscription_item(9320404)
+
+    assert coordinator.session.request.await_count == 4
+    coordinator.async_request_refresh.assert_awaited_once()
