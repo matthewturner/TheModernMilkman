@@ -325,6 +325,29 @@ async def test_get_event_uid_returns_uuid_when_event_matches():
     assert isinstance(result, str)
 
 
+@pytest.mark.asyncio
+async def test_get_event_uid_matches_when_optional_fields_are_omitted():
+    """A provider event is recognized even if it omits description and location."""
+    service_data = {
+        "entity_id": "calendar.test",
+        "start_date": date(2099, 1, 1),
+        "end_date": date(2099, 1, 1),
+        "summary": "Milkround",
+        "description": "None",
+        "location": "None",
+    }
+    hass = MagicMock()
+    hass.services.async_call = AsyncMock(
+        return_value={
+            "calendar.test": {"events": [{"summary": "Milkround"}]}
+        }
+    )
+
+    assert await get_event_uid(hass, service_data) == generate_uuid_from_json(
+        service_data
+    )
+
+
 # ---------------------------------------------------------------------------
 # add_to_calendar
 # ---------------------------------------------------------------------------
@@ -371,6 +394,9 @@ async def test_add_to_calendar_creates_event_when_not_already_present():
         await add_to_calendar(hass, "calendar.test", event, entry)
 
     mock_create.assert_called_once()
+    hass.config_entries.async_update_entry.assert_called_once_with(
+        entry, data={"uids": [expected_uid]}
+    )
 
 
 @pytest.mark.asyncio
@@ -403,6 +429,41 @@ async def test_add_to_calendar_skips_creation_when_uid_already_present():
         await add_to_calendar(hass, "calendar.test", event, entry)
 
     mock_create.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_add_to_calendar_calls_create_only_one_event():
+    """Concurrent refreshes are serialized so they cannot create duplicate events."""
+    event = CalendarEvent(date(2099, 1, 1), date(2099, 1, 1), "Milkround")
+    entry = MagicMock()
+    entry.data = {"uids": []}
+    hass = MagicMock()
+    lock = asyncio.Lock()
+    event_exists = False
+
+    async def mock_get_event_uid(_hass, service_data):
+        if event_exists:
+            return generate_uuid_from_json(service_data)
+        return None
+
+    async def mock_create_event(_hass, _service_data):
+        nonlocal event_exists
+        await asyncio.sleep(0)
+        event_exists = True
+
+    with patch(
+        "custom_components.themodernmilkman.calendar.get_event_uid",
+        side_effect=mock_get_event_uid,
+    ), patch(
+        "custom_components.themodernmilkman.calendar.create_event",
+        side_effect=mock_create_event,
+    ) as mock_create:
+        await asyncio.gather(
+            add_to_calendar(hass, "calendar.test", event, entry, lock),
+            add_to_calendar(hass, "calendar.test", event, entry, lock),
+        )
+
+    mock_create.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

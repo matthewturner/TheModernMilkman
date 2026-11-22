@@ -1,5 +1,6 @@
 """The Modern Milkman calendar platform."""
 
+import asyncio
 from datetime import date, datetime, timedelta
 import hashlib
 import json
@@ -14,15 +15,15 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .coordinator import TMMCoordinator
 from .const import (
     CONF_COORDINATOR,
-    DOMAIN,
     CONF_CALENDARS,
-    CONF_NEXT_DELIVERY,
     CONF_DELIVERYDATE,
+    CONF_NEXT_DELIVERY,
     CONF_UNKNOWN,
+    DOMAIN,
 )
+from .coordinator import TMMCoordinator
 
 
 def _get_next_delivery_event(coordinator_data: dict) -> CalendarEvent | None:
@@ -58,6 +59,7 @@ async def async_setup_entry(
     calendars = entry.data[CONF_CALENDARS]
 
     coordinator = hass.data[DOMAIN][entry.entry_id][CONF_COORDINATOR]
+    calendar_update_lock = asyncio.Lock()
 
     sensors = [TMMCalendarSensor(coordinator, entry.title)]
 
@@ -65,7 +67,9 @@ async def async_setup_entry(
     if next_event is not None:
         for calendar_id in calendars:
             if calendar_id != "None":
-                await add_to_calendar(hass, calendar_id, next_event, entry)
+                await add_to_calendar(
+                    hass, calendar_id, next_event, entry, calendar_update_lock
+                )
 
     if "None" in calendars:
         async_add_entities(sensors, update_before_add=True)
@@ -77,7 +81,9 @@ async def async_setup_entry(
             return
         for calendar_id in calendars:
             if calendar_id != "None":
-                await add_to_calendar(hass, calendar_id, event, entry)
+                await add_to_calendar(
+                    hass, calendar_id, event, entry, calendar_update_lock
+                )
 
     @callback
     def _handle_coordinator_update() -> None:
@@ -148,21 +154,32 @@ async def get_event_uid(hass: HomeAssistant, service_data) -> str | None:
 
     if events is not None and entity_id in events:
         for event in events[entity_id].get("events"):
-            if (
-                event["summary"] == service_data["summary"]
-                and event["description"] == service_data["description"]
-                and event["location"] == service_data["location"]
-            ):
+            if event["summary"] == service_data["summary"]:
                 return generate_uuid_from_json(service_data)
 
     return None
 
 
 async def add_to_calendar(
-    hass: HomeAssistant, calendar: str, event: CalendarEvent, entry: ConfigEntry
+    hass: HomeAssistant,
+    calendar: str,
+    event: CalendarEvent,
+    entry: ConfigEntry,
+    lock: asyncio.Lock | None = None,
 ):
     """Add an event to the calendar."""
 
+    if lock is not None:
+        async with lock:
+            await _add_to_calendar(hass, calendar, event, entry)
+        return
+
+    await _add_to_calendar(hass, calendar, event, entry)
+
+
+async def _add_to_calendar(
+    hass: HomeAssistant, calendar: str, event: CalendarEvent, entry: ConfigEntry
+) -> None:
     service_data = {
         "entity_id": calendar,
         "start_date": event.start,
@@ -174,7 +191,7 @@ async def add_to_calendar(
 
     uid = await get_event_uid(hass, service_data)
 
-    uids = entry.data.get("uids", [])
+    uids = list(entry.data.get("uids", []))
 
     if uid not in uids:
         await create_event(hass, service_data)
