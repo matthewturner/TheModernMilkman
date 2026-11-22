@@ -190,16 +190,14 @@ async def _add_to_calendar(
     }
 
     uid = await get_event_uid(hass, service_data)
-
     uids = list(entry.data.get("uids", []))
 
-    if uid not in uids:
+    if uid is None:
         await create_event(hass, service_data)
+        uid = await get_event_uid(hass, service_data)
 
-        created_event_uid = await get_event_uid(hass, service_data)
-
-        if created_event_uid is not None and created_event_uid not in uids:
-            uids.append(created_event_uid)
+    if uid is not None and uid not in uids:
+        uids.append(uid)
 
     if uids != entry.data.get("uids", []):
         updated_data = entry.data.copy()
