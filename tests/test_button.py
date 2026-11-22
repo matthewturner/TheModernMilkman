@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.themodernmilkman.button import (
     TMMSkipProductButton,
+    TMMQuantityButton,
     TMMRefreshButton,
     async_setup_entry,
 )
@@ -64,6 +65,7 @@ def test_async_setup_entry_adds_refresh_and_skip_buttons():
     assert len(add_calls) == 1
     assert sum(isinstance(entity, TMMRefreshButton) for entity in add_calls[0]) == 1
     assert sum(isinstance(entity, TMMSkipProductButton) for entity in add_calls[0]) == 2
+    assert sum(isinstance(entity, TMMQuantityButton) for entity in add_calls[0]) == 4
 
 
 def test_async_setup_entry_listener_adds_new_skip_button():
@@ -78,7 +80,7 @@ def test_async_setup_entry_listener_adds_new_skip_button():
     get_listener()()
 
     assert len(add_calls) == 2
-    assert len(add_calls[1]) == 1
+    assert len(add_calls[1]) == 3
     assert isinstance(add_calls[1][0], TMMSkipProductButton)
 
 
@@ -104,3 +106,21 @@ def test_skip_button_press_calls_skip_api_with_subscription_item_id():
     asyncio.run(button.async_press())
 
     coordinator.async_skip_subscription_item.assert_awaited_once_with(9320404)
+
+
+def test_quantity_button_press_adjusts_quantity_by_delta():
+    """Pressing increase/decrease calls the coordinator with +1/-1."""
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.async_adjust_item_quantity = AsyncMock()
+    item = {"productName": "Milk", "subscriptionItemId": 9320404}
+
+    up = TMMQuantityButton(coordinator, "Test", 1, item, 1)
+    down = TMMQuantityButton(coordinator, "Test", 1, item, -1)
+    asyncio.run(up.async_press())
+    asyncio.run(down.async_press())
+
+    assert up.entity_description.name == "Increase Product 1"
+    assert down.entity_description.name == "Decrease Product 1"
+    coordinator.async_adjust_item_quantity.assert_any_await(9320404, 1)
+    coordinator.async_adjust_item_quantity.assert_any_await(9320404, -1)

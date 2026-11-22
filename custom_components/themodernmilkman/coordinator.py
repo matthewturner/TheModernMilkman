@@ -10,6 +10,9 @@ from .const import (
     TMM_LOGIN_URL,
     TMM_NEXT_DELIVERY_URL,
     TMM_SKIP_SUBSCRIPTION_URL,
+    TMM_SUBSCRIPTIONS_URL,
+    TMM_UPDATE_SUBSCRIPTION_URL,
+    MAX_PRODUCT_QUANTITY,
     TMM_USER_WASTEAGE_URL,
     CONF_PASSWORD,
     CONF_USERNAME,
@@ -136,6 +139,73 @@ class TMMCoordinator(DataUpdateCoordinator):
         handle_status_code(response.status)
         if response.status not in (200, 201, 204):
             raise UpdateFailed(f"Unable to skip subscription item: {response.status}")
+
+        await self.async_request_refresh()
+
+    async def async_adjust_item_quantity(
+        self, subscription_item_id: int, delta: int
+    ) -> None:
+        """Change a subscription item's quantity for the next delivery day."""
+        next_delivery = self.data.get(CONF_NEXT_DELIVERY)
+        if not next_delivery or next_delivery == CONF_UNKNOWN:
+            raise UpdateFailed("No next delivery available to amend")
+
+        delivery_date = datetime.fromisoformat(
+            self._normalise_skip_date(next_delivery[CONF_DELIVERYDATE])
+        )
+        # The API numbers days like JS getDay(): Sunday=0 .. Saturday=6.
+        delivery_day = delivery_date.isoweekday() % 7
+
+        await self._async_login()
+
+        user_resp = await self.session.request(method="GET", url=TMM_USER_STATE_URL)
+        handle_status_code(user_resp.status)
+        user_state = json.loads(await user_resp.text())
+        customer_id = (user_state.get("user") or {}).get("customerId") or (
+            (user_state.get("customer") or {}).get("user") or {}
+        ).get("customerId")
+        if customer_id is None:
+            raise UpdateFailed("Unable to determine customer ID")
+
+        subs_resp = await self.session.request(
+            method="GET", url=TMM_SUBSCRIPTIONS_URL
+        )
+        handle_status_code(subs_resp.status)
+        subscription = json.loads(await subs_resp.text())
+
+        item = next(
+            (
+                i
+                for i in subscription.get("subscriptionItems", [])
+                if i.get("subscriptionItemId") == subscription_item_id
+            ),
+            None,
+        )
+        schedules = (item or {}).get("subscriptionItemSchedules") or []
+        if not schedules:
+            raise UpdateFailed("Subscription item not found")
+        schedule = next((s for s in schedules if s.get("day") == delivery_day), schedules[0])
+
+        new_quantity = max(1, min(MAX_PRODUCT_QUANTITY, schedule["quantity"] + delta))
+        if new_quantity == schedule["quantity"]:
+            return
+
+        response = await self.session.request(
+            method="POST",
+            url=TMM_UPDATE_SUBSCRIPTION_URL,
+            json={
+                "customerId": customer_id,
+                "subscriptionId": subscription["subscriptionId"],
+                "subscriptionItemId": subscription_item_id,
+                "dailyQuantities": [
+                    {"day": schedule["day"], "quantity": new_quantity}
+                ],
+            },
+            headers=REQUEST_HEADER,
+        )
+        handle_status_code(response.status)
+        if response.status not in (200, 201, 204):
+            raise UpdateFailed(f"Unable to update quantity: {response.status}")
 
         await self.async_request_refresh()
 

@@ -23,6 +23,17 @@ def _skip_button_unique_id(name: str, index: int) -> str:
     return f"{DOMAIN}-{name}-product_{index}_skip".lower()
 
 
+def _product_buttons(
+    coordinator: TMMCoordinator, name: str, index: int, item: dict
+) -> list[ButtonEntity]:
+    """Build the skip and quantity buttons for one product."""
+    return [
+        TMMSkipProductButton(coordinator, name, index, item),
+        TMMQuantityButton(coordinator, name, index, item, 1),
+        TMMQuantityButton(coordinator, name, index, item, -1),
+    ]
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -38,9 +49,9 @@ async def async_setup_entry(
         for index, item in enumerate(items, start=1):
             if item.get("subscriptionItemId") is None:
                 continue
-            skip_button = TMMSkipProductButton(coordinator, entry.title, index, item)
-            hass.data[DOMAIN][skip_button.unique_id] = skip_button
-            buttons.append(skip_button)
+            product_buttons = _product_buttons(coordinator, entry.title, index, item)
+            hass.data[DOMAIN][product_buttons[0].unique_id] = product_buttons[0]
+            buttons.extend(product_buttons)
 
     async_add_entities(buttons)
 
@@ -58,9 +69,11 @@ async def async_setup_entry(
                 continue
             unique_id = _skip_button_unique_id(entry.title, index)
             if unique_id not in hass.data[DOMAIN]:
-                skip_button = TMMSkipProductButton(coordinator, entry.title, index, item)
-                hass.data[DOMAIN][skip_button.unique_id] = skip_button
-                new_buttons.append(skip_button)
+                product_buttons = _product_buttons(
+                    coordinator, entry.title, index, item
+                )
+                hass.data[DOMAIN][product_buttons[0].unique_id] = product_buttons[0]
+                new_buttons.extend(product_buttons)
 
         if new_buttons:
             async_add_entities(new_buttons)
@@ -94,13 +107,13 @@ class TMMRefreshButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
         await self.coordinator.async_request_refresh()
 
 
-class TMMSkipProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
-    """Button to skip a specific product from the next delivery."""
+class _TMMProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
+    """Base for buttons tied to a product in the next delivery."""
 
     def __init__(
         self, coordinator: TMMCoordinator, name: str, index: int, item: dict
     ) -> None:
-        """Initialize the skip button."""
+        """Initialize the product button."""
         super().__init__(coordinator)
         self._index = index
         self._item = item
@@ -110,13 +123,6 @@ class TMMSkipProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
             model="Milkround",
             name=name,
             configuration_url="https://github.com/jampez77/TheModernMilkman/",
-        )
-        self._attr_unique_id = _skip_button_unique_id(name, index)
-        self.entity_id = f"button.{DOMAIN}_product_{index}_skip"
-        self.entity_description = ButtonEntityDescription(
-            key=f"themodernmilkman_product_{index}_skip",
-            name=f"Skip Product {index}",
-            icon="mdi:skip-next-circle",
         )
 
     @property
@@ -142,6 +148,23 @@ class TMMSkipProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
             self._item = None
         self.async_write_ha_state()
 
+
+class TMMSkipProductButton(_TMMProductButton):
+    """Button to skip a specific product from the next delivery."""
+
+    def __init__(
+        self, coordinator: TMMCoordinator, name: str, index: int, item: dict
+    ) -> None:
+        """Initialize the skip button."""
+        super().__init__(coordinator, name, index, item)
+        self._attr_unique_id = _skip_button_unique_id(name, index)
+        self.entity_id = f"button.{DOMAIN}_product_{index}_skip"
+        self.entity_description = ButtonEntityDescription(
+            key=f"themodernmilkman_product_{index}_skip",
+            name=f"Skip Product {index}",
+            icon="mdi:skip-next-circle",
+        )
+
     async def async_press(self) -> None:
         """Skip product for next delivery."""
         if not self._item or self._item.get("subscriptionItemId") is None:
@@ -149,4 +172,39 @@ class TMMSkipProductButton(CoordinatorEntity[TMMCoordinator], ButtonEntity):
 
         await self.coordinator.async_skip_subscription_item(
             self._item["subscriptionItemId"]
+        )
+
+
+class TMMQuantityButton(_TMMProductButton):
+    """Button to increase or decrease a product's quantity on the next delivery."""
+
+    def __init__(
+        self,
+        coordinator: TMMCoordinator,
+        name: str,
+        index: int,
+        item: dict,
+        delta: int,
+    ) -> None:
+        """Initialize the quantity button."""
+        super().__init__(coordinator, name, index, item)
+        self._delta = delta
+        action = "increase" if delta > 0 else "decrease"
+        self._attr_unique_id = (
+            f"{DOMAIN}-{name}-product_{index}_{action}".lower()
+        )
+        self.entity_id = f"button.{DOMAIN}_product_{index}_{action}"
+        self.entity_description = ButtonEntityDescription(
+            key=f"themodernmilkman_product_{index}_{action}",
+            name=f"{action.capitalize()} Product {index}",
+            icon="mdi:plus-circle" if delta > 0 else "mdi:minus-circle",
+        )
+
+    async def async_press(self) -> None:
+        """Change the product quantity for the next delivery."""
+        if not self._item or self._item.get("subscriptionItemId") is None:
+            raise HomeAssistantError("No subscription item available to amend")
+
+        await self.coordinator.async_adjust_item_quantity(
+            self._item["subscriptionItemId"], self._delta
         )
